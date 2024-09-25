@@ -2,12 +2,13 @@ import json
 import logging
 import asyncio
 from typing import Dict
+from copy import deepcopy
 
 import ipaddress
 
 import aiohttp
 from aiohttp import client_exceptions
-import aioredis
+import redis
 
 from channels.layers import get_channel_layer
 
@@ -46,7 +47,6 @@ class WebsocketRelayConnection:
         verify_ssl: bool = settings.BROADCAST_WEBSOCKET_VERIFY_CERT,
     ):
         self.name = name
-        self.event_loop = asyncio.get_event_loop()
         self.stats = stats
         self.remote_host = remote_host
         self.remote_port = remote_port
@@ -109,7 +109,10 @@ class WebsocketRelayConnection:
             self.stats.record_connection_lost()
 
     def start(self):
-        self.async_task = self.event_loop.create_task(self.connect())
+        self.async_task = asyncio.get_running_loop().create_task(
+            self.connect(),
+            name=f"WebsocketRelayConnection.connect.{self.name}",
+        )
         return self.async_task
 
     def cancel(self):
@@ -120,7 +123,10 @@ class WebsocketRelayConnection:
         # metrics messages
         # the "metrics" group is not subscribed to in the typical fashion, so we
         # just explicitly create it
-        producer = self.event_loop.create_task(self.run_producer("metrics", websocket, "metrics"))
+        producer = asyncio.get_running_loop().create_task(
+            self.run_producer("metrics", websocket, "metrics"),
+            name="WebsocketRelayConnection.run_producer.metrics",
+        )
         self.producers["metrics"] = {"task": producer, "subscriptions": {"metrics"}}
         async for msg in websocket:
             self.stats.record_message_received()
@@ -142,7 +148,10 @@ class WebsocketRelayConnection:
                     name = f"{self.remote_host}-{group}"
                     origin_channel = payload['origin_channel']
                     if not self.producers.get(name):
-                        producer = self.event_loop.create_task(self.run_producer(name, websocket, group))
+                        producer = asyncio.get_running_loop().create_task(
+                            self.run_producer(name, websocket, group),
+                            name=f"WebsocketRelayConnection.run_producer.{name}",
+                        )
                         self.producers[name] = {"task": producer, "subscriptions": {origin_channel}}
                         logger.debug(f"Producer {name} started.")
                     else:
@@ -190,7 +199,7 @@ class WebsocketRelayConnection:
                         return
 
                     continue
-                except aioredis.errors.ConnectionClosedError:
+                except redis.exceptions.ConnectionError:
                     logger.info(f"Producer {name} lost connection to Redis, shutting down.")
                     return
 
@@ -241,7 +250,7 @@ class WebSocketRelayManager(object):
                 # In this case, we'll be sharing a redis, no need to relay.
                 if payload.get("hostname") == self.local_hostname:
                     hostname = payload.get("hostname")
-                    logger.debug("Received a heartbeat request for {hostname}. Skipping as we use redis for local host.")
+                    logger.debug(f"Received a heartbeat request for {hostname}. Skipping as we use redis for local host.")
                     continue
 
                 action = payload.get("action")
@@ -296,26 +305,40 @@ class WebSocketRelayManager(object):
             pass
 
     async def run(self):
-        event_loop = asyncio.get_running_loop()
-
-        self.stats_mgr = RelayWebsocketStatsManager(event_loop, self.local_hostname)
+        self.stats_mgr = RelayWebsocketStatsManager(self.local_hostname)
         self.stats_mgr.start()
 
-        # Set up a pg_notify consumer for allowing web nodes to "provision" and "deprovision" themselves gracefully.
-        database_conf = settings.DATABASES['default']
+        database_conf = deepcopy(settings.DATABASES['default'])
+        database_conf['OPTIONS'] = deepcopy(database_conf.get('OPTIONS', {}))
+
+        for k, v in settings.LISTENER_DATABASES.get('default', {}).items():
+            if k != 'OPTIONS':
+                database_conf[k] = v
+        for k, v in settings.LISTENER_DATABASES.get('default', {}).get('OPTIONS', {}).items():
+            database_conf['OPTIONS'][k] = v
+
+        if 'PASSWORD' in database_conf:
+            database_conf['OPTIONS']['password'] = database_conf.pop('PASSWORD')
+
         async_conn = await psycopg.AsyncConnection.connect(
             dbname=database_conf['NAME'],
             host=database_conf['HOST'],
             user=database_conf['USER'],
-            password=database_conf['PASSWORD'],
             port=database_conf['PORT'],
             **database_conf.get("OPTIONS", {}),
         )
+
         await async_conn.set_autocommit(True)
-        event_loop.create_task(self.on_ws_heartbeat(async_conn))
+        on_ws_heartbeat_task = asyncio.get_running_loop().create_task(
+            self.on_ws_heartbeat(async_conn),
+            name="WebSocketRelayManager.on_ws_heartbeat",
+        )
 
         # Establishes a websocket connection to /websocket/relay on all API servers
         while True:
+            if on_ws_heartbeat_task.done():
+                raise Exception("on_ws_heartbeat_task has exited")
+
             future_remote_hosts = self.known_hosts.keys()
             current_remote_hosts = self.relay_connections.keys()
             deleted_remote_hosts = set(current_remote_hosts) - set(future_remote_hosts)
@@ -339,7 +362,7 @@ class WebSocketRelayManager(object):
 
             if deleted_remote_hosts:
                 logger.info(f"Removing {deleted_remote_hosts} from websocket broadcast list")
-                await asyncio.gather(self.cleanup_offline_host(h) for h in deleted_remote_hosts)
+                await asyncio.gather(*[self.cleanup_offline_host(h) for h in deleted_remote_hosts])
 
             if new_remote_hosts:
                 logger.info(f"Adding {new_remote_hosts} to websocket broadcast list")

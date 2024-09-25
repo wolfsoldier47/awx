@@ -17,7 +17,7 @@ from collections import OrderedDict
 
 # Django
 from django.conf import settings
-from django.db import models, connection
+from django.db import models, connection, transaction
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import now
@@ -31,13 +31,15 @@ from rest_framework.exceptions import ParseError
 from polymorphic.models import PolymorphicModel
 
 from ansible_base.lib.utils.models import prevent_search, get_type_for_model
+from ansible_base.rbac import permission_registry
 
 # AWX
 from awx.main.models.base import CommonModelNameNotUnique, PasswordFieldsModel, NotificationFieldsModel
 from awx.main.dispatch import get_task_queuename
 from awx.main.dispatch.control import Control as ControlDispatcher
 from awx.main.registrar import activity_stream_registrar
-from awx.main.models.mixins import ResourceMixin, TaskManagerUnifiedJobMixin, ExecutionEnvironmentMixin
+from awx.main.models.mixins import TaskManagerUnifiedJobMixin, ExecutionEnvironmentMixin
+from awx.main.models.rbac import to_permissions
 from awx.main.utils.common import (
     camelcase_to_underscore,
     get_model_for_type,
@@ -196,9 +198,7 @@ class UnifiedJobTemplate(PolymorphicModel, CommonModelNameNotUnique, ExecutionEn
 
     @classmethod
     def _submodels_with_roles(cls):
-        ujt_classes = [c for c in cls.__subclasses__() if c._meta.model_name not in ['inventorysource', 'systemjobtemplate']]
-        ct_dict = ContentType.objects.get_for_models(*ujt_classes)
-        return [ct.id for ct in ct_dict.values()]
+        return [c for c in cls.__subclasses__() if permission_registry.is_registered(c)]
 
     @classmethod
     def accessible_pk_qs(cls, accessor, role_field):
@@ -210,7 +210,23 @@ class UnifiedJobTemplate(PolymorphicModel, CommonModelNameNotUnique, ExecutionEn
         # do not use this if in a subclass
         if cls != UnifiedJobTemplate:
             return super(UnifiedJobTemplate, cls).accessible_pk_qs(accessor, role_field)
-        return ResourceMixin._accessible_pk_qs(cls, accessor, role_field, content_types=cls._submodels_with_roles())
+        from ansible_base.rbac.models import RoleEvaluation
+
+        action = to_permissions[role_field]
+
+        # Special condition for super auditor
+        role_subclasses = cls._submodels_with_roles()
+        role_cts = ContentType.objects.get_for_models(*role_subclasses).values()
+        all_codenames = {f'{action}_{cls._meta.model_name}' for cls in role_subclasses}
+        if not (all_codenames - accessor.singleton_permissions()):
+            qs = cls.objects.filter(polymorphic_ctype__in=role_cts)
+            return qs.values_list('id', flat=True)
+
+        return (
+            RoleEvaluation.objects.filter(role__in=accessor.has_roles.all(), codename__in=all_codenames, content_type_id__in=[ct.id for ct in role_cts])
+            .values_list('object_id')
+            .distinct()
+        )
 
     def _perform_unique_checks(self, unique_checks):
         # Handle the list of unique fields returned above. Replace with an
@@ -264,7 +280,14 @@ class UnifiedJobTemplate(PolymorphicModel, CommonModelNameNotUnique, ExecutionEn
         if new_next_schedule:
             if new_next_schedule.pk == self.next_schedule_id and new_next_schedule.next_run == self.next_job_run:
                 return  # no-op, common for infrequent schedules
-            self.next_schedule = new_next_schedule
+
+            # If in a transaction, use select_for_update to lock the next schedule row, which
+            # prevents a race condition if new_next_schedule is deleted elsewhere during this transaction
+            if transaction.get_autocommit():
+                self.next_schedule = related_schedules.first()
+            else:
+                self.next_schedule = related_schedules.select_for_update().first()
+
             self.next_job_run = new_next_schedule.next_run
             self.save(update_fields=['next_schedule', 'next_job_run'])
 
@@ -814,7 +837,7 @@ class UnifiedJob(
                 update_fields.append(key)
 
         if parent_instance:
-            if self.status in ('pending', 'waiting', 'running'):
+            if self.status in ('pending', 'running'):
                 if parent_instance.current_job != self:
                     parent_instance_set('current_job', self)
                 # Update parent with all the 'good' states of it's child
@@ -851,7 +874,7 @@ class UnifiedJob(
         # If this job already exists in the database, retrieve a copy of
         # the job in its prior state.
         # If update_fields are given without status, then that indicates no change
-        if self.pk and ((not update_fields) or ('status' in update_fields)):
+        if self.status != 'waiting' and self.pk and ((not update_fields) or ('status' in update_fields)):
             self_before = self.__class__.objects.get(pk=self.pk)
             if self_before.status != self.status:
                 status_before = self_before.status
@@ -893,7 +916,8 @@ class UnifiedJob(
                 update_fields.append('elapsed')
 
         # Ensure that the job template information is current.
-        if self.unified_job_template != self._get_parent_instance():
+        # unless status is 'waiting', because this happens in large batches at end of task manager runs and is blocking
+        if self.status != 'waiting' and self.unified_job_template != self._get_parent_instance():
             self.unified_job_template = self._get_parent_instance()
             if 'unified_job_template' not in update_fields:
                 update_fields.append('unified_job_template')
@@ -906,8 +930,9 @@ class UnifiedJob(
         # Okay; we're done. Perform the actual save.
         result = super(UnifiedJob, self).save(*args, **kwargs)
 
-        # If status changed, update the parent instance.
-        if self.status != status_before:
+        # If status changed, update the parent instance
+        # unless status is 'waiting', because this happens in large batches at end of task manager runs and is blocking
+        if self.status != status_before and self.status != 'waiting':
             # Update parent outside of the transaction for Job w/ allow_simultaneous=True
             # This dodges lock contention at the expense of the foreign key not being
             # completely correct.
@@ -1599,7 +1624,8 @@ class UnifiedJob(
             extra["controller_node"] = self.controller_node or "NOT_SET"
         elif state == "execution_node_chosen":
             extra["execution_node"] = self.execution_node or "NOT_SET"
-        logger_job_lifecycle.info(msg, extra=extra)
+
+        logger_job_lifecycle.info(f"{msg} {json.dumps(extra)}")
 
     @property
     def launched_by(self):

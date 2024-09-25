@@ -35,8 +35,8 @@ runs:
     - name: Start AWX
       shell: bash
       run: |
-        DEV_DOCKER_TAG_BASE=ghcr.io/${{ github.repository_owner }} \
-        COMPOSE_TAG=${{ github.base_ref }} \
+        DEV_DOCKER_OWNER=${{ github.repository_owner }} \
+        COMPOSE_TAG=${{ github.base_ref || github.ref_name }} \
         COMPOSE_UP_OPTS="-d" \
         make docker-compose
 
@@ -57,21 +57,11 @@ runs:
           awx-manage update_password --username=admin --password=password
         EOSH
 
-    - name: Build UI
-      # This must be a string comparison in composite actions:
-      # https://github.com/actions/runner/issues/2238
-      if: ${{ inputs.build-ui == 'true' }}
-      shell: bash
-      run: |
-        docker exec -i tools_awx_1 sh <<-EOSH
-          make ui-devel
-        EOSH
-
     - name: Get instance data
       id: data
       shell: bash
       run: |
-        AWX_IP=$(docker inspect -f '{{.NetworkSettings.Networks._sources_awx.IPAddress}}' tools_awx_1)
+        AWX_IP=$(docker inspect -f '{{.NetworkSettings.Networks.awx.IPAddress}}' tools_awx_1)
         ADMIN_TOKEN=$(docker exec -i tools_awx_1 awx-manage create_oauth2_token --user admin)
         echo "ip=$AWX_IP" >> $GITHUB_OUTPUT
         echo "admin_token=$ADMIN_TOKEN" >> $GITHUB_OUTPUT

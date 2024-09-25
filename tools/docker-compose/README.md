@@ -22,7 +22,7 @@ Once you have a local copy, run the commands in the following sections from the 
 
 Here are the main `make` targets:
 
-- `docker-compose-build` - used for building the development image, which is used by the `docker-compose` target
+- `docker-compose-build` - used for building the development image, which is used by the `docker-compose` target. You can skip this target if you want to use the latest [ghcr.io/ansible/awx_devel:devel](https://github.com/ansible/awx/pkgs/container/awx_devel) image rather than build a new one.
 - `docker-compose` - make target for development, passes awx_devel image and tag
 
 Notable files:
@@ -208,13 +208,25 @@ awx_1        |   Applying auth.0001_initial... OK
 
 ##### Clean and build the UI
 
+Prerequisites (on your local machine)
+- npm
+- nodejs
+
+Required versions listed here https://github.com/ansible/ansible-ui/blob/main/README.md
+
+On your local machine (not in awx container)
+
 ```bash
-$ docker exec tools_awx_1 make clean-ui ui-devel
+make clean/ui ui
 ```
 
-See [the ui development documentation](../../awx/ui/README.md) for more information on using the frontend development, build, and test tooling.
+This will clone the ansible-ui into the `awx/ui/src` directory and build the static files. Then when the containers come up, awx-manage collectstatic will copy those files into the proper place.
 
-Once migrations are completed and the UI is built, you can begin using AWX. The UI can be reached in your browser at `https://localhost:8043/#/home`, and the API can be found at `https://localhost:8043/api/v2`.
+You can also use `UI_LOCAL` to build from a locally cloned ansible-ui repo.
+
+See [the ui development documentation](https://github.com/ansible/ansible-ui/blob/main/CONTRIBUTING.md) for more information on using the frontend development, build, and test tooling.
+
+Once migrations are completed and the UI is built, you can begin using AWX. The UI can be reached in your browser at `https://localhost:8043/`, and the API can be found at `https://localhost:8043/api/v2`.
 
 ##### Create an admin user
 
@@ -354,7 +366,7 @@ We are now ready to run two one time commands to build and pre-populate the Keyc
 
 The first one time command will be creating a Keycloak database in your postgres database by running:
 ```bash
-docker exec tools_postgres_1 /usr/bin/psql -U awx --command "create database keycloak with encoding 'UTF8';"
+docker exec tools_postgres_1 /usr/bin/psql -U postgres --command 'CREATE DATABASE keycloak WITH OWNER=awx encoding "UTF8";'
 ```
 
 After running this command the following message should appear and you should be returned to your prompt:
@@ -365,7 +377,7 @@ CREATE DATABASE
 The second one time command will be to start a Keycloak container to build our admin user; be sure to set pg_username and pg_password to work for you installation. Note: the command below set the username as admin with a password of admin, you can change this if you want. Also, if you are using your own container or have changed the pg_username please update the command accordingly.
 ```bash
 PG_PASSWORD=`cat tools/docker-compose/_sources/secrets/pg_password.yml  | cut -f 2 -d \'`
-docker run --rm -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin --net=_sources_default \
+docker run --rm -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin --net=sources_awx \
            -e DB_VENDOR=postgres -e DB_ADDR=postgres -e DB_DATABASE=keycloak -e DB_USER=awx -e DB_PASSWORD=${PG_PASSWORD} \
            quay.io/keycloak/keycloak:15.0.2
 ```
@@ -387,7 +399,7 @@ Now we are ready to configure and plumb Keycloak with AWX. To do this we have pr
 * Backup and configure the SMAL and OIDC adapter in AWX. NOTE: the private key of any existing SAML or OIDC adapters can not be backed up through the API, you need a DB backup to recover this.
 
 Before we can run the playbook we need to understand that SAML works by sending redirects between AWX and Keycloak through the browser. Because of this we have to tell both AWX and Keycloak how they will construct the redirect URLs. On the Keycloak side, this is done within the realm configuration and on the AWX side its done through the SAML settings. The playbook requires a variable called `container_reference` to be set. The container_reference variable needs to be how your browser will be able to talk to the running containers.  Here are some examples of how to choose a proper container_reference.
-* If you develop on a mac which runs a Fedora VM which has AWX running within that and the browser you use to access AWX runs on the mac. The the VM with the container has its own IP that is mapped to a name like `tower.home.net`. In this scenario your "container_reference" could be either the IP of the VM or the tower.home.net friendly name.
+* If you develop on a mac which runs a Fedora VM which has AWX running within that and the browser you use to access AWX runs on the mac. The VM with the container has its own IP that is mapped to a name like `tower.home.net`. In this scenario your "container_reference" could be either the IP of the VM or the tower.home.net friendly name.
 * If you are on a Fedora work station running AWX and also using a browser on your workstation you could use localhost, your work stations IP or hostname as the container_reference.
 
 In addition, OIDC works similar but slightly differently. OIDC has browser redirection but OIDC will also communicate from the AWX docker instance to the Keycloak docker instance directly. Any hostnames you might have are likely not propagated down into the AWX container. So we need a method for both the browser and AWX container to talk to Keycloak. For this we will likely use your machines IP address. This can be passed in as a variable called `oidc_reference`. If unset this will default to container_reference which may be viable for some configurations.
@@ -561,11 +573,11 @@ If you have a playbook like:
         var: the_secret_from_vault
 ```
 
-And run it through AWX with the credential `Credential From Vault via Token Auth` tied to it, the debug should result in `this_is_the_secret_value`. If you run it through AWX with the credential `Credential From Vault via Userpass Auth`, the debug should result in `this_is_the_userpass_secret_value`. 
+And run it through AWX with the credential `Credential From Vault via Token Auth` tied to it, the debug should result in `this_is_the_secret_value`. If you run it through AWX with the credential `Credential From Vault via Userpass Auth`, the debug should result in `this_is_the_userpass_secret_value`.
 
 ### HashiVault with LDAP
 
-If you wish to have your OpenLDAP container connected to the Vault container, you will first need to have the OpenLDAP container running alongside AWX and Vault. 
+If you wish to have your OpenLDAP container connected to the Vault container, you will first need to have the OpenLDAP container running alongside AWX and Vault.
 
 
 ```bash
@@ -574,7 +586,7 @@ VAULT=true LDAP=true make docker-compose
 
 ```
 
-Similar to the above, you will need to unseal the vault before we can run the other needed playbooks. 
+Similar to the above, you will need to unseal the vault before we can run the other needed playbooks.
 
 ```bash
 
@@ -582,7 +594,7 @@ ansible-playbook tools/docker-compose/ansible/unseal_vault.yml
 
 ```
 
-Now that the vault is unsealed, we can plumb the vault container now while passing true to enable_ldap extra var. 
+Now that the vault is unsealed, we can plumb the vault container now while passing true to enable_ldap extra var.
 
 
 ```bash
@@ -595,7 +607,7 @@ ansible-playbook tools/docker-compose/ansible/plumb_vault.yml -e enable_ldap=tru
 
 ```
 
-This will populate your AWX instance with LDAP specific items. 
+This will populate your AWX instance with LDAP specific items.
 
 - A vault LDAP Lookup Cred tied to the LDAP `awx_ldap_vault` user called `Vault LDAP Lookup Cred`
 - A credential called `Credential From HashiCorp Vault via LDAP Auth`  which is of the created type using the `Vault LDAP Lookup Cred` to get the secret.
@@ -613,3 +625,13 @@ docker exec -it -e VAULT_TOKEN=<token> tools_vault_1 vault kv get --address=http
 ### Prometheus and Grafana integration
 
 See docs at https://github.com/ansible/awx/blob/devel/tools/grafana/README.md
+
+### OpenTelemetry Integration
+
+```bash
+OTEL=true GRAFANA=true LOKI=true PROMETHEUS=true make docker-compose
+```
+
+This will start the sidecar container `tools_otel_1` and configure AWX logging to send to it. The OpenTelemetry Collector is configured to export logs to Loki. Grafana is configured with Loki as a datasource. AWX logs can be viewed in Grafana.
+
+`http://localhost:3001` grafana

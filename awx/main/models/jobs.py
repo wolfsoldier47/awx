@@ -205,6 +205,9 @@ class JobTemplate(UnifiedJobTemplate, JobOptions, SurveyJobTemplateMixin, Resour
     class Meta:
         app_label = 'main'
         ordering = ('name',)
+        permissions = [('execute_jobtemplate', 'Can run this job template')]
+        # Remove add permission, ability to add comes from use permission for inventory, project, credentials
+        default_permissions = ('change', 'delete', 'view')
 
     job_type = models.CharField(
         max_length=64,
@@ -625,7 +628,7 @@ class Job(UnifiedJob, JobOptions, SurveyJobMixin, JobNotificationMixin, TaskMana
         return reverse('api:job_detail', kwargs={'pk': self.pk}, request=request)
 
     def get_ui_url(self):
-        return urljoin(settings.TOWER_URL_BASE, "/#/jobs/playbook/{}".format(self.pk))
+        return urljoin(settings.TOWER_URL_BASE, "{}/jobs/playbook/{}".format(settings.OPTIONAL_UI_URL_PREFIX, self.pk))
 
     def _set_default_dependencies_processed(self):
         """
@@ -1272,7 +1275,7 @@ class SystemJob(UnifiedJob, SystemJobOptions, JobNotificationMixin):
         return reverse('api:system_job_detail', kwargs={'pk': self.pk}, request=request)
 
     def get_ui_url(self):
-        return urljoin(settings.TOWER_URL_BASE, "/#/jobs/system/{}".format(self.pk))
+        return urljoin(settings.TOWER_URL_BASE, "{}/jobs/management/{}".format(settings.OPTIONAL_UI_URL_PREFIX, self.pk))
 
     @property
     def event_class(self):

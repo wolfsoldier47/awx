@@ -48,23 +48,23 @@ class AnalyticsRootView(APIView):
 
     def get(self, request, format=None):
         data = OrderedDict()
-        data['authorized'] = reverse('api:analytics_authorized')
-        data['reports'] = reverse('api:analytics_reports_list')
-        data['report_options'] = reverse('api:analytics_report_options_list')
-        data['adoption_rate'] = reverse('api:analytics_adoption_rate')
-        data['adoption_rate_options'] = reverse('api:analytics_adoption_rate_options')
-        data['event_explorer'] = reverse('api:analytics_event_explorer')
-        data['event_explorer_options'] = reverse('api:analytics_event_explorer_options')
-        data['host_explorer'] = reverse('api:analytics_host_explorer')
-        data['host_explorer_options'] = reverse('api:analytics_host_explorer_options')
-        data['job_explorer'] = reverse('api:analytics_job_explorer')
-        data['job_explorer_options'] = reverse('api:analytics_job_explorer_options')
-        data['probe_templates'] = reverse('api:analytics_probe_templates_explorer')
-        data['probe_templates_options'] = reverse('api:analytics_probe_templates_options')
-        data['probe_template_for_hosts'] = reverse('api:analytics_probe_template_for_hosts_explorer')
-        data['probe_template_for_hosts_options'] = reverse('api:analytics_probe_template_for_hosts_options')
-        data['roi_templates'] = reverse('api:analytics_roi_templates_explorer')
-        data['roi_templates_options'] = reverse('api:analytics_roi_templates_options')
+        data['authorized'] = reverse('api:analytics_authorized', request=request)
+        data['reports'] = reverse('api:analytics_reports_list', request=request)
+        data['report_options'] = reverse('api:analytics_report_options_list', request=request)
+        data['adoption_rate'] = reverse('api:analytics_adoption_rate', request=request)
+        data['adoption_rate_options'] = reverse('api:analytics_adoption_rate_options', request=request)
+        data['event_explorer'] = reverse('api:analytics_event_explorer', request=request)
+        data['event_explorer_options'] = reverse('api:analytics_event_explorer_options', request=request)
+        data['host_explorer'] = reverse('api:analytics_host_explorer', request=request)
+        data['host_explorer_options'] = reverse('api:analytics_host_explorer_options', request=request)
+        data['job_explorer'] = reverse('api:analytics_job_explorer', request=request)
+        data['job_explorer_options'] = reverse('api:analytics_job_explorer_options', request=request)
+        data['probe_templates'] = reverse('api:analytics_probe_templates_explorer', request=request)
+        data['probe_templates_options'] = reverse('api:analytics_probe_templates_options', request=request)
+        data['probe_template_for_hosts'] = reverse('api:analytics_probe_template_for_hosts_explorer', request=request)
+        data['probe_template_for_hosts_options'] = reverse('api:analytics_probe_template_for_hosts_options', request=request)
+        data['roi_templates'] = reverse('api:analytics_roi_templates_explorer', request=request)
+        data['roi_templates_options'] = reverse('api:analytics_roi_templates_options', request=request)
         return Response(data)
 
 
@@ -185,8 +185,12 @@ class AnalyticsGenericView(APIView):
 
             self._get_setting('INSIGHTS_TRACKING_STATE', False, ERROR_UPLOAD_NOT_ENABLED)
             url = self._get_analytics_url(request.path)
-            rh_user = self._get_setting('REDHAT_USERNAME', None, ERROR_MISSING_USER)
-            rh_password = self._get_setting('REDHAT_PASSWORD', None, ERROR_MISSING_PASSWORD)
+            try:
+                rh_user = self._get_setting('REDHAT_USERNAME', None, ERROR_MISSING_USER)
+                rh_password = self._get_setting('REDHAT_PASSWORD', None, ERROR_MISSING_PASSWORD)
+            except MissingSettings:
+                rh_user = self._get_setting('SUBSCRIPTIONS_USERNAME', None, ERROR_MISSING_USER)
+                rh_password = self._get_setting('SUBSCRIPTIONS_PASSWORD', None, ERROR_MISSING_PASSWORD)
 
             if method not in ["GET", "POST", "OPTIONS"]:
                 return self._error_response(ERROR_UNSUPPORTED_METHOD, method, remote=False, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -196,9 +200,9 @@ class AnalyticsGenericView(APIView):
                     url,
                     auth=(rh_user, rh_password),
                     verify=settings.INSIGHTS_CERT_PATH,
-                    params=request.query_params,
+                    params=getattr(request, 'query_params', {}),
                     headers=headers,
-                    json=request.data,
+                    json=getattr(request, 'data', {}),
                     timeout=(31, 31),
                 )
             #

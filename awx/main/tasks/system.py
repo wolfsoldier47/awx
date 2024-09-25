@@ -6,6 +6,7 @@ import itertools
 import json
 import logging
 import os
+import psycopg
 from io import StringIO
 from contextlib import redirect_stdout
 import shutil
@@ -35,6 +36,9 @@ import ansible_runner.cleanup
 # dateutil
 from dateutil.parser import parse as parse_date
 
+# django-ansible-base
+from ansible_base.resource_registry.tasks.sync import SyncExecutor
+
 # AWX
 from awx import __version__ as awx_application_version
 from awx.main.access import access_registry
@@ -50,7 +54,7 @@ from awx.main.models import (
     Job,
     convert_jsonfields,
 )
-from awx.main.constants import ACTIVE_STATES
+from awx.main.constants import ACTIVE_STATES, ERROR_STATES
 from awx.main.dispatch.publish import task
 from awx.main.dispatch import get_task_queuename, reaper
 from awx.main.utils.common import ignore_inventory_computed_fields, ignore_inventory_group_removal
@@ -416,7 +420,7 @@ def handle_removed_image(remove_images=None):
 
 @task(queue=get_task_queuename)
 def cleanup_images_and_files():
-    _cleanup_images_and_files()
+    _cleanup_images_and_files(image_prune=True)
 
 
 @task(queue=get_task_queuename)
@@ -630,10 +634,18 @@ def cluster_node_heartbeat(dispatch_time=None, worker_tasks=None):
                 logger.error("Host {} last checked in at {}, marked as lost.".format(other_inst.hostname, other_inst.last_seen))
 
         except DatabaseError as e:
-            if 'did not affect any rows' in str(e):
-                logger.debug('Another instance has marked {} as lost'.format(other_inst.hostname))
+            cause = e.__cause__
+            if cause and hasattr(cause, 'sqlstate'):
+                sqlstate = cause.sqlstate
+                sqlstate_str = psycopg.errors.lookup(sqlstate)
+                logger.debug('SQL Error state: {} - {}'.format(sqlstate, sqlstate_str))
+
+                if sqlstate == psycopg.errors.NoData:
+                    logger.debug('Another instance has marked {} as lost'.format(other_inst.hostname))
+                else:
+                    logger.exception("Error marking {} as lost.".format(other_inst.hostname))
             else:
-                logger.exception('Error marking {} as lost'.format(other_inst.hostname))
+                logger.exception('No SQL state available.  Error marking {} as lost'.format(other_inst.hostname))
 
     # Run local reaper
     if worker_tasks is not None:
@@ -673,6 +685,8 @@ def awx_receptor_workunit_reaper():
 
     unit_ids = [id for id in receptor_work_list]
     jobs_with_unreleased_receptor_units = UnifiedJob.objects.filter(work_unit_id__in=unit_ids).exclude(status__in=ACTIVE_STATES)
+    if settings.RECEPTOR_KEEP_WORK_ON_ERROR:
+        jobs_with_unreleased_receptor_units = jobs_with_unreleased_receptor_units.exclude(status__in=ERROR_STATES)
     for job in jobs_with_unreleased_receptor_units:
         logger.debug(f"{job.log_format} is not active, reaping receptor work unit {job.work_unit_id}")
         receptor_ctl.simple_command(f"work cancel {job.work_unit_id}")
@@ -692,7 +706,10 @@ def awx_k8s_reaper():
         logger.debug("Checking for orphaned k8s pods for {}.".format(group))
         pods = PodManager.list_active_jobs(group)
         time_cutoff = now() - timedelta(seconds=settings.K8S_POD_REAPER_GRACE_PERIOD)
-        for job in UnifiedJob.objects.filter(pk__in=pods.keys(), finished__lte=time_cutoff).exclude(status__in=ACTIVE_STATES):
+        reap_job_candidates = UnifiedJob.objects.filter(pk__in=pods.keys(), finished__lte=time_cutoff).exclude(status__in=ACTIVE_STATES)
+        if settings.RECEPTOR_KEEP_WORK_ON_ERROR:
+            reap_job_candidates = reap_job_candidates.exclude(status__in=ERROR_STATES)
+        for job in reap_job_candidates:
             logger.debug('{} is no longer active, reaping orphaned k8s pod'.format(job.log_format))
             try:
                 pm = PodManager(job)
@@ -703,7 +720,8 @@ def awx_k8s_reaper():
 
 @task(queue=get_task_queuename)
 def awx_periodic_scheduler():
-    with advisory_lock('awx_periodic_scheduler_lock', wait=False) as acquired:
+    lock_session_timeout_milliseconds = settings.TASK_MANAGER_LOCK_TIMEOUT * 1000
+    with advisory_lock('awx_periodic_scheduler_lock', lock_session_timeout_milliseconds=lock_session_timeout_milliseconds, wait=False) as acquired:
         if acquired is False:
             logger.debug("Not running periodic scheduler, another task holds lock")
             return
@@ -788,10 +806,19 @@ def update_inventory_computed_fields(inventory_id):
     try:
         i.update_computed_fields()
     except DatabaseError as e:
-        if 'did not affect any rows' in str(e):
-            logger.debug('Exiting duplicate update_inventory_computed_fields task.')
-            return
-        raise
+        # https://github.com/django/django/blob/eff21d8e7a1cb297aedf1c702668b590a1b618f3/django/db/models/base.py#L1105
+        # django raises DatabaseError("Forced update did not affect any rows.")
+
+        # if sqlstate is set then there was a database error and otherwise will re-raise that error
+        cause = e.__cause__
+        if cause and hasattr(cause, 'sqlstate'):
+            sqlstate = cause.sqlstate
+            sqlstate_str = psycopg.errors.lookup(sqlstate)
+            logger.error('SQL Error state: {} - {}'.format(sqlstate, sqlstate_str))
+            raise
+
+        # otherwise
+        logger.debug('Exiting duplicate update_inventory_computed_fields task.')
 
 
 def update_smart_memberships_for_inventory(smart_inventory):
@@ -946,3 +973,27 @@ def deep_copy_model_obj(model_module, model_name, obj_pk, new_obj_pk, user_pk, p
             permission_check_func(creater, copy_mapping.values())
     if isinstance(new_obj, Inventory):
         update_inventory_computed_fields.delay(new_obj.id)
+
+
+@task(queue=get_task_queuename)
+def periodic_resource_sync():
+    if not getattr(settings, 'RESOURCE_SERVER', None):
+        logger.debug("Skipping periodic resource_sync, RESOURCE_SERVER not configured")
+        return
+
+    with advisory_lock('periodic_resource_sync', wait=False) as acquired:
+        if acquired is False:
+            logger.debug("Not running periodic_resource_sync, another task holds lock")
+            return
+        logger.debug("Running periodic resource sync")
+
+        executor = SyncExecutor()
+        executor.run()
+        for key, item_list in executor.results.items():
+            if not item_list or key == 'noop':
+                continue
+            # Log creations and conflicts
+            if len(item_list) > 10 and settings.LOG_AGGREGATOR_LEVEL != 'DEBUG':
+                logger.info(f'Periodic resource sync {key}, first 10 items:\n{item_list[:10]}')
+            else:
+                logger.info(f'Periodic resource sync {key}:\n{item_list}')

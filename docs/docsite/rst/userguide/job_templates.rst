@@ -473,7 +473,7 @@ When slice jobs are running, job lists display the workflow and job slices, as w
 
 .. note::
 
-  You may launch jobs in bulk using the newly added endpoint in the API, ``/api/v2/bulk/job_launch``. This endpoint accepts JSON and you can specify a list of unified job templates (such as job templates, project updates, etc) to launch. The user must have the appropriate permission to launch all the jobs. Either all jobs are launched, or an error is returned indicating why the operation was not able to complete. Use the **OPTIONS** request to return relevant schema. For more information, see the `Bulk endpoint <https://docs.ansible.com/automation-controller/latest/html/controllerapi/api_ref.html#/Bulk>`_ of the *Reference* section of the |atapi|.
+  You may launch jobs in bulk using the newly added endpoint in the API, ``/api/v2/bulk/job_launch``. This endpoint accepts JSON and you can specify a list of unified job templates (such as job templates, project updates, etc) to launch. The user must have the appropriate permission to launch all the jobs. Either all jobs are launched, or an error is returned indicating why the operation was not able to complete. Use the **OPTIONS** request to return relevant schema. For more information, see the `Bulk endpoint <https://ansible.readthedocs.io/projects/awx/en/latest/rest_api/api_ref.html#/Bulk>`_ of the *Reference* section of the |atapi|.
 
 
 Copy a Job Template
@@ -961,6 +961,8 @@ Extra Variables
 
 When you pass survey variables, they are passed as extra variables (``extra_vars``) within AWX. This can be tricky, as passing extra variables to a job template (as you would do with a survey) can override other variables being passed from the inventory and project.
 
+By default, ``extra_vars`` are marked as ``!unsafe`` unless you specify them on the job template’s Extra Variables section. These are trusted, because they can only be added by users with enough privileges to add or edit a Job Template. For example, nested variables do not expand when entered as a prompt, as the Jinja brackets are treated as a string. For more information about unsafe variables, see `unsafe or raw strings <https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_advanced_syntax.html#unsafe-or-raw-strings>`_.
+
 For example, say that you have a defined variable for an inventory for ``debug = true``. It is entirely possible that this variable, ``debug = true``, can be overridden in a job template survey.
 
 To ensure that the variables you need to pass are not overridden, ensure they are included by redefining them in the survey. Keep in mind that extra variables can be defined at the inventory, group, and host levels. 
@@ -979,7 +981,7 @@ If specifying the ``ALLOW_JINJA_IN_EXTRA_VARS`` parameter, refer to the :ref:`AW
   The Job Template extra variables dictionary is merged with the Survey variables. 
 
 
-Here are some simplified examples of extra_vars in YAML and JSON formats:
+Here are some simplified examples of ``extra_vars`` in YAML and JSON formats:
 
 The configuration in YAML format:
 

@@ -7,6 +7,7 @@ import json
 import yaml
 import logging
 import time
+import psycopg
 import os
 import subprocess
 import re
@@ -17,13 +18,14 @@ import threading
 import contextlib
 import tempfile
 import functools
+from importlib.metadata import version as _get_version
 
 # Django
 from django.core.exceptions import ObjectDoesNotExist, FieldDoesNotExist
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
-from django.db import connection, transaction, ProgrammingError, IntegrityError
+from django.db import connection, DatabaseError, transaction, ProgrammingError, IntegrityError
 from django.db.models.fields.related import ForeignObjectRel, ManyToManyField
 from django.db.models.fields.related_descriptors import ForwardManyToOneDescriptor, ManyToManyDescriptor
 from django.db.models.query import QuerySet
@@ -136,7 +138,7 @@ def underscore_to_camelcase(s):
 @functools.cache
 def is_testing(argv=None):
     '''Return True if running django or py.test unit tests.'''
-    if 'PYTEST_CURRENT_TEST' in os.environ.keys():
+    if os.environ.get('DJANGO_SETTINGS_MODULE') == 'awx.main.tests.settings_for_test':
         return True
     argv = sys.argv if argv is None else argv
     if len(argv) >= 1 and ('py.test' in argv[0] or 'py/test.py' in argv[0]):
@@ -144,6 +146,14 @@ def is_testing(argv=None):
     elif len(argv) >= 2 and argv[1] == 'test':
         return True
     return False
+
+
+def bypass_in_test(func):
+    def fn(*args, **kwargs):
+        if not is_testing():
+            return func(*args, **kwargs)
+
+    return fn
 
 
 class RequireDebugTrueOrTest(logging.Filter):
@@ -221,9 +231,7 @@ def get_awx_version():
     from awx import __version__
 
     try:
-        import pkg_resources
-
-        return pkg_resources.require('awx')[0].version
+        return _get_version('awx')
     except Exception:
         return __version__
 
@@ -1155,11 +1163,25 @@ def create_partition(tblname, start=None):
                     f'ALTER TABLE {tblname} ATTACH PARTITION {tblname}_{partition_label} '
                     f'FOR VALUES FROM (\'{start_timestamp}\') TO (\'{end_timestamp}\');'
                 )
+
     except (ProgrammingError, IntegrityError) as e:
-        if 'already exists' in str(e):
-            logger.info(f'Caught known error due to partition creation race: {e}')
-        else:
-            raise
+        cause = e.__cause__
+        if cause and hasattr(cause, 'sqlstate'):
+            sqlstate = cause.sqlstate
+            sqlstate_cls = psycopg.errors.lookup(sqlstate)
+
+            if psycopg.errors.DuplicateTable == sqlstate_cls or psycopg.errors.UniqueViolation == sqlstate_cls:
+                logger.info(f'Caught known error due to partition creation race: {e}')
+            else:
+                logger.error('SQL Error state: {} - {}'.format(sqlstate, sqlstate_cls))
+                raise
+    except DatabaseError as e:
+        cause = e.__cause__
+        if cause and hasattr(cause, 'sqlstate'):
+            sqlstate = cause.sqlstate
+            sqlstate_str = psycopg.errors.lookup(sqlstate)
+            logger.error('SQL Error state: {} - {}'.format(sqlstate, sqlstate_str))
+        raise
 
 
 def cleanup_new_process(func):

@@ -1,6 +1,7 @@
 import os
 import psycopg
 import select
+from copy import deepcopy
 
 from contextlib import contextmanager
 
@@ -94,14 +95,15 @@ class PubSub(object):
 
 
 def create_listener_connection():
-    conf = settings.DATABASES['default'].copy()
-    conf['OPTIONS'] = conf.get('OPTIONS', {}).copy()
+    conf = deepcopy(settings.DATABASES['default'])
+    conf['OPTIONS'] = deepcopy(conf.get('OPTIONS', {}))
     # Modify the application name to distinguish from other connections the process might use
     conf['OPTIONS']['application_name'] = get_application_name(settings.CLUSTER_HOST_ID, function='listener')
 
     # Apply overrides specifically for the listener connection
     for k, v in settings.LISTENER_DATABASES.get('default', {}).items():
-        conf[k] = v
+        if k != 'OPTIONS':
+            conf[k] = v
     for k, v in settings.LISTENER_DATABASES.get('default', {}).get('OPTIONS', {}).items():
         conf['OPTIONS'][k] = v
 

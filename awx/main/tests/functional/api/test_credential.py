@@ -12,25 +12,13 @@ from awx.api.versioning import reverse
 EXAMPLE_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nxyz==\n-----END PRIVATE KEY-----'
 EXAMPLE_ENCRYPTED_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nxyz==\n-----END PRIVATE KEY-----'
 
-
-@pytest.mark.django_db
-def test_idempotent_credential_type_setup():
-    assert CredentialType.objects.count() == 0
-    CredentialType.setup_tower_managed_defaults()
-    total = CredentialType.objects.count()
-    assert total > 0
-
-    CredentialType.setup_tower_managed_defaults()
-    assert CredentialType.objects.count() == total
-
-
 #
 # user credential creation
 #
 
 
 @pytest.mark.django_db
-def test_create_user_credential_via_credentials_list(post, get, alice, credentialtype_ssh):
+def test_create_user_credential_via_credentials_list(post, get, alice, credentialtype_ssh, setup_managed_roles):
     params = {
         'credential_type': 1,
         'inputs': {'username': 'someusername'},
@@ -81,7 +69,7 @@ def test_credential_validation_error_with_multiple_owner_fields(post, admin, ali
 
 
 @pytest.mark.django_db
-def test_create_user_credential_via_user_credentials_list(post, get, alice, credentialtype_ssh):
+def test_create_user_credential_via_user_credentials_list(post, get, alice, credentialtype_ssh, setup_managed_roles):
     params = {
         'credential_type': 1,
         'inputs': {'username': 'someusername'},
@@ -385,10 +373,9 @@ def test_list_created_org_credentials(post, get, organization, org_admin, org_me
 @pytest.mark.django_db
 def test_list_cannot_order_by_encrypted_field(post, get, organization, org_admin, credentialtype_ssh, order_by):
     for i, password in enumerate(('abc', 'def', 'xyz')):
-        response = post(reverse('api:credential_list'), {'organization': organization.id, 'name': 'C%d' % i, 'password': password}, org_admin)
+        post(reverse('api:credential_list'), {'organization': organization.id, 'name': 'C%d' % i, 'password': password}, org_admin, expect=400)
 
-    response = get(reverse('api:credential_list'), org_admin, QUERY_STRING='order_by=%s' % order_by, status=400)
-    assert response.status_code == 400
+    get(reverse('api:credential_list'), org_admin, QUERY_STRING='order_by=%s' % order_by, expect=400)
 
 
 @pytest.mark.django_db
@@ -399,8 +386,7 @@ def test_inputs_cannot_contain_extra_fields(get, post, organization, admin, cred
         'credential_type': credentialtype_ssh.pk,
         'inputs': {'invalid_field': 'foo'},
     }
-    response = post(reverse('api:credential_list'), params, admin)
-    assert response.status_code == 400
+    response = post(reverse('api:credential_list'), params, admin, expect=400)
     assert "'invalid_field' was unexpected" in response.data['inputs'][0]
 
 

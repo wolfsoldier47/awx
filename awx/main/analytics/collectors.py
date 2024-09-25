@@ -419,7 +419,7 @@ def _events_table(since, full_path, until, tbl, where_column, project_job_create
                           resolved_action,
                           resolved_role,
                           -- '-' operator listed here:
-                          -- https://www.postgresql.org/docs/12/functions-json.html
+                          -- https://www.postgresql.org/docs/15/functions-json.html
                           -- note that operator is only supported by jsonb objects
                           -- https://www.postgresql.org/docs/current/datatype-json.html
                           (CASE WHEN event = 'playbook_on_stats' THEN {event_data} - 'artifact_data' END) as playbook_on_stats,
@@ -442,11 +442,6 @@ def _events_table(since, full_path, until, tbl, where_column, project_job_create
         return query
 
     return _copy_table(table='events', query=query(fr"replace({tbl}.event_data, '\u', '\u005cu')::jsonb"), path=full_path)
-
-
-@register('events_table', '1.5', format='csv', description=_('Automation task records'), expensive=four_hour_slicing)
-def events_table_unpartitioned(since, full_path, until, **kwargs):
-    return _events_table(since, full_path, until, '_unpartitioned_main_jobevent', 'created', **kwargs)
 
 
 @register('events_table', '1.5', format='csv', description=_('Automation task records'), expensive=four_hour_slicing)

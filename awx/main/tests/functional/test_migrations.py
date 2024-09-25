@@ -1,6 +1,7 @@
 import pytest
 
 from django_test_migrations.plan import all_migrations, nodes_to_tuples
+from django.utils.timezone import now
 
 """
 Most tests that live in here can probably be deleted at some point. They are mainly
@@ -68,3 +69,40 @@ class TestMigrationSmoke:
         bar_peers = bar.peers.all()
         assert len(bar_peers) == 1
         assert fooaddr in bar_peers
+
+    def test_migrate_DAB_RBAC(self, migrator):
+        old_state = migrator.apply_initial_migration(('main', '0190_alter_inventorysource_source_and_more'))
+        Organization = old_state.apps.get_model('main', 'Organization')
+        Team = old_state.apps.get_model('main', 'Team')
+        User = old_state.apps.get_model('auth', 'User')
+
+        org = Organization.objects.create(name='arbitrary-org', created=now(), modified=now())
+        user = User.objects.create(username='random-user')
+        org.read_role.members.add(user)
+        org.member_role.members.add(user)
+
+        team = Team.objects.create(name='arbitrary-team', organization=org, created=now(), modified=now())
+        team.member_role.members.add(user)
+
+        new_state = migrator.apply_tested_migration(
+            ('main', '0192_custom_roles'),
+        )
+
+        RoleUserAssignment = new_state.apps.get_model('dab_rbac', 'RoleUserAssignment')
+        assert RoleUserAssignment.objects.filter(user=user.id, object_id=org.id).exists()
+        assert RoleUserAssignment.objects.filter(user=user.id, role_definition__name='Controller Organization Member', object_id=org.id).exists()
+        assert RoleUserAssignment.objects.filter(user=user.id, role_definition__name='Controller Team Member', object_id=team.id).exists()
+
+        # Regression testing for bug that comes from current vs past models mismatch
+        RoleDefinition = new_state.apps.get_model('dab_rbac', 'RoleDefinition')
+        assert not RoleDefinition.objects.filter(name='Organization Organization Admin').exists()
+        # Test special cases in managed role creation
+        assert not RoleDefinition.objects.filter(name='Organization Team Admin').exists()
+        assert not RoleDefinition.objects.filter(name='Organization InstanceGroup Admin').exists()
+
+        # Test that a removed EE model permission has been deleted
+        new_state = migrator.apply_tested_migration(
+            ('main', '0195_EE_permissions'),
+        )
+        DABPermission = new_state.apps.get_model('dab_rbac', 'DABPermission')
+        assert not DABPermission.objects.filter(codename='view_executionenvironment').exists()

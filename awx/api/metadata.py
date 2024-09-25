@@ -36,11 +36,13 @@ class Metadata(metadata.SimpleMetadata):
         field_info = OrderedDict()
         field_info['type'] = self.label_lookup[field]
         field_info['required'] = getattr(field, 'required', False)
+        field_info['hidden'] = getattr(field, 'hidden', False)
 
         text_attrs = [
             'read_only',
             'label',
             'help_text',
+            'warning_text',
             'min_length',
             'max_length',
             'min_value',
@@ -101,7 +103,7 @@ class Metadata(metadata.SimpleMetadata):
             default = field.get_default()
             if type(default) is UUID:
                 default = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-            if field.field_name == 'TOWER_URL_BASE' and default == 'https://towerhost':
+            if field.field_name == 'TOWER_URL_BASE' and default == 'https://platformhost':
                 default = '{}://{}'.format(self.request.scheme, self.request.get_host())
             field_info['default'] = default
         except serializers.SkipField:

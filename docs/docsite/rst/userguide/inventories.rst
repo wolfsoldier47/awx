@@ -1,4 +1,4 @@
- .. _ug_inventories:
+.. _ug_inventories:
 
 *******************
 Inventories
@@ -94,10 +94,10 @@ In some situations, you can modify the following:
 
 - A new Host manually created on Inventory w/ inventory sources
 - In Groups that were created as a result of inventory source syncs
-- Variables on Host and Group are changeable
 
 Hosts associated with the Smart Inventory are manifested at view time. If the results of a Smart Inventory contains more than one host with identical hostnames, only one of the matching hosts will be included as part of the Smart Inventory, ordered by Host ID.
 
+Variables on Host and Group are not changeable even as the local system admin user.
 
 .. _ug_host_filters:
 
@@ -170,10 +170,13 @@ To use ``ansible_facts`` to define the host filter when creating Smart Inventori
 1. In the *Create new smart inventory screen*, click the |search| button next to the **Smart host filter** field to open a pop-up window to filter hosts for this inventory.
 
 .. image:: ../common/images/inventories-smart-create-filter-highlighted.png
+   :alt: Create smart inventory window with Smart host filter highlighted
+
 
 2. In the search pop-up window, change the search criteria from **Name** to **Advanced** and select **ansible_facts** from the **Key** field.
 
 .. image:: ../common/images/inventories-smart-define-host-filter.png
+   :alt: Host filter with drop-down menu options
 
 
 If you wanted to add an ansible fact of
@@ -186,24 +189,29 @@ If you wanted to add an ansible fact of
 In the search field, enter ``ansible_processor[]="GenuineIntel"`` (no extra spaces or ``__`` before the value) and press **[Enter]**.
 
 .. image:: ../common/images/inventories-smart-define-host-filter-facts.png
+   :alt: Example of an advanced search for host filter Ansible facts
 
 The resulting search criteria for the specified ansible fact populates in the lower part of the window.
 
 .. image:: ../common/images/inventories-smart-define-host-filter-facts2.png
+   :alt: Selected search criteria for host filter Ansible facts listed below search field
 
 3. Click **Select** to add it to the **Smart host filter** field.
 
 .. image:: ../common/images/inventories-smart-create-filter-added.png
+   :alt: Specified search criteria for host filter Ansible facts shown in the Smart host filter field of the Create new smart inventory window
 
 4. Click **Save** to save the new Smart Inventory.
 
 The Details tab of the new Smart Inventory opens and displays the specified ansible facts in the **Smart host filter** field.
 
 .. image:: ../common/images/inventories-smart-create-details.png
+   :alt: Details tab of the new Smart Inventory displaying the specified Ansible facts in the Smart host filter field
 
 5. From the Details view, you can edit the **Smart host filter** field by clicking **Edit** and delete existing filter(s), clear all existing filters, or add new ones.
 
 .. image:: ../common/images/inventories-smart-define-host-filter-facts-group.png
+   :alt: Specified search criteria consisting of host filter Ansible facts and groups listed below search field
 
 
 .. _ug_inventories_constructed:
@@ -246,6 +254,7 @@ The hosts inside the input inventory will fit one condition, the other condition
 neither, or both. This results in four hosts total for demonstration purposes.
 
 .. image:: ../common/images/inventories-constructed-inventory-venn.png
+   :alt: Venn diagram describing the input inventory content for a constructed inventory
 
 
 This folder defines the inventory as an ini type named ``two_conditions.ini``:
@@ -459,33 +468,7 @@ Follow the procedure described in the subsequent section, :ref:`ug_inventories_a
 Example of a constructed inventory details view:
 
 .. image:: ../common/images/inventories-constructed-inventory-details.png
-
-
-
-.. _ug_inventories_plugins:
-
-Inventory Plugins
-===================
-
-.. index::
-   pair: inventories; plugins
-
-Inventory updates use dynamically-generated YAML files which are parsed by their respective inventory plugin. Users can provide the new style inventory plugin config directly to AWX via the inventory source ``source_vars`` for all the following inventory sources:
-
-- :ref:`ug_source_ec2`
-- :ref:`ug_source_gce`
-- :ref:`ug_source_azure`
-- :ref:`ug_source_vmvcenter`
-- :ref:`ug_source_satellite`
-- :ref:`ug_source_insights`
-- :ref:`ug_source_openstack`
-- :ref:`ug_source_rhv`
-- :ref:`ug_source_rhaap`
-
-
-Newly created configurations for inventory sources will contain the default plugin configuration values. If you want your newly created inventory sources to match the output of legacy sources, you must apply a specific set of configuration values for that source. To ensure backward compatibility, AWX uses "templates" for each of these sources to force the output of inventory plugins into the legacy format. Refer to :ref:`ir_inv_plugin_templates_reference` section of this guide for each source and their respective templates to help you migrate to the new style inventory plugin output.
-
-``source_vars`` that contain ``plugin: foo.bar.baz`` as a top-level key will be replaced with the appropriate fully-qualified inventory plugin name at runtime based on the ``InventorySource`` source. For example, if ec2 is selected for the ``InventorySource`` then, at run-time, plugin will be set to ``amazon.aws.aws_ec2``.
+   :alt: Constructed inventory details
 
 
 .. _ug_inventories_add:
@@ -515,6 +498,7 @@ The type of inventory is identified at the top of the create form.
 |Inventories_create_new - create new inventory|
 
 .. |Inventories_create_new - create new inventory| image:: ../common/images/inventories-create-new-inventory.png
+   :alt: Create new inventory form
 
 2. Enter the appropriate details into the following fields:
 
@@ -528,6 +512,7 @@ The type of inventory is identified at the top of the create form.
 - **Instance Groups**: Click the |search| button to open a separate window. Choose the instance group(s) for this inventory to run on. If the list is extensive, use the search to narrow the options. You may select multiple instance groups and sort them in the order you want them ran.
 
 .. image:: ../common/images/select-instance-groups-modal.png
+   :alt: Select instance groups dialog
 
 - **Labels**: Optionally supply labels that describe this inventory, so they can be used to group and filter inventories and jobs.
 
@@ -559,6 +544,7 @@ The type of inventory is identified at the top of the create form.
 |Inventories_create_new_saved - create new inventory|
 
 .. |Inventories_create_new_saved - create new inventory| image:: ../common/images/inventories-create-new-saved-inventory.png
+   :alt: Example Create new inventory form filled out
 
 3. Click **Save** when done.
 
@@ -602,6 +588,7 @@ To create a new group for an inventory:
 |Inventories_manage_group_add|
 
 .. |Inventories_manage_group_add| image:: ../common/images/inventories-add-group-new.png
+   :alt: Create new group form for inventories
 
 2. Enter the appropriate details into the required and optional fields:
 
@@ -634,12 +621,16 @@ The **Create Group** window closes and the newly created group displays as an en
 |Inventories add group subgroup|
 
 .. |Inventories add group subgroup| image:: ../common/images/inventories-add-group-subgroup-added.png
+   :alt: Related Groups tab of the Groups form for inventories
+
 
 If you chose to add an existing group, available groups will appear in a separate selection window.
 
 |Inventories add group existing subgroup|
 
 .. |Inventories add group existing subgroup| image:: ../common/images/inventories-add-group-existing-subgroup.png
+   :alt: Existing group appearing in a separate selection window
+
 
 Once a group is selected, it displays as an entry in the list of groups associated with the group.
 
@@ -655,6 +646,7 @@ The list view displays all your inventory groups at once, or you can filter it t
 You may be able to delete a subgroup without concern for dependencies, since AWX will look for dependencies such as any child groups or hosts. If any exists, a confirmation dialog displays for you to choose whether to delete the root group and all of its subgroups and hosts; or promote the subgroup(s) so they become the top-level inventory group(s), along with their host(s).
 
 .. image:: ../common/images/inventories-groups-delete-root-with-children.png
+   :alt: Delete group confirmation dialog box with a prompt to select whether to delete all groups and hosts or promote child groups and hosts
 
 .. _ug_inventories_add_host:
 
@@ -670,6 +662,8 @@ You can configure hosts for the inventory as well as for groups and groups withi
 3. If creating a new host, select the |toggle button| button to specify whether or not to include this host while running jobs.
 
 .. |toggle button| image:: ../common/images/on-off-toggle-button.png
+   :alt: Toggle button to include this host while running jobs
+
 
 4. Enter the appropriate details into the required and optional fields:
 
@@ -684,12 +678,16 @@ The **Create Host** window closes and the newly created host displays as an entr
 |Inventories add group host|
 
 .. |Inventories add group host| image:: ../common/images/inventories-add-group-host-added.png
+   :alt: Hosts tab of the Groups window showing available hosts
+
 
 If you chose to add an existing host, available hosts will appear in a separate selection window.
 
 |Inventories add existing host|
 
 .. |Inventories add existing host| image:: ../common/images/inventories-add-existing-host.png
+   :alt: Existing host appearing in a separate selection window
+
 
 Once a host is selected, it displays as an entry in the list of hosts associated with the group. You can disassociate a host from this screen by selecting the host and click the **Disassociate** button.
 
@@ -704,12 +702,16 @@ list of hosts.
 |Inventories add group host emphasized|
 
 .. |Inventories add group host emphasized| image:: ../common/images/inventories-add-group-host-added-emphasized.png
+   :alt: Inventories add host emphasized
+
 
 This opens the Details tab of the selected host.
 
 |Inventories add group host details|
 
 .. |Inventories add group host details| image:: ../common/images/inventories-add-group-host-details.png
+   :alt: Host details tab for the selected inventory
+
 
 7. Click the **Groups** tab to configure groups for the host.
 
@@ -718,6 +720,7 @@ This opens the Details tab of the selected host.
     Available groups appear in a separate selection window.
 
     .. image:: ../common/images/inventories-add-group-hosts-add-groups.png
+       :alt: Select Groups dialog showing two available groups
 
   b. Click to select the group(s) to associate with the host and click **Save**.
 
@@ -726,13 +729,14 @@ This opens the Details tab of the selected host.
 8. If a host was used to run a job, you can view details about those jobs in the **Completed Jobs** tab of the host and click **Expanded** to view details about each job.
 
 .. image:: ../common/images/inventories-add-host-view-completed-jobs.png
+   :alt: Jobs tab showing list of completed jobs associated with the selected host
 
 
 .. _ug_inventories_add_host_bulk_api:
 
 .. note::
 
-  You may create hosts in bulk using the newly added endpoint in the API, ``/api/v2/bulk/host_create``. This endpoint accepts JSON and you can specify the target inventory and a list of hosts to add to the inventory. These hosts must be unique within the inventory. Either all hosts are added, or an error is returned indicating why the operation was not able to complete. Use the **OPTIONS** request to return relevant schema. For more information, see the `Bulk endpoint <https://docs.ansible.com/automation-controller/latest/html/controllerapi/api_ref.html#/Bulk>`_ of the *Reference* section of the |atapi|.
+  You may create hosts in bulk using the newly added endpoint in the API, ``/api/v2/bulk/host_create``. This endpoint accepts JSON and you can specify the target inventory and a list of hosts to add to the inventory. These hosts must be unique within the inventory. Either all hosts are added, or an error is returned indicating why the operation was not able to complete. Use the **OPTIONS** request to return relevant schema. For more information, see the `Bulk endpoint <https://ansible.readthedocs.io/projects/awx/en/latest/rest_api/api_ref.html#/Bulk>`_ of the *Reference* section of the |atapi|.
 
 .. _ug_inventories_add_source:
 
@@ -750,6 +754,7 @@ This opens the Create Source window.
 |Inventories create source|
 
 .. |Inventories create source| image:: ../common/images/inventories-create-source.png
+   :alt: Create new source form for inventory source
 
 
 3. Enter the appropriate details into the required and optional fields:
@@ -816,6 +821,7 @@ This opens the Create Source window.
     The **Notifications** tab is only present after you save the newly-created source.
 
     .. image:: ../common/images/inventories-create-source-with-notifications-tab.png
+       :alt: Notification tab for the inventory source
 
 12.  To configure notifications for the source, click the **Notifications** tab.
 
@@ -831,6 +837,7 @@ Once a source is defined, it displays as an entry in the list of sources associa
 |Inventories view sources|
 
 .. |Inventories view sources| image:: ../common/images/inventories-view-sources.png
+   :alt: Sources tab of the inventory showing one inventory source
 
 
 .. _ug_inventory_sources:
@@ -860,12 +867,14 @@ An inventory that is sourced from a project means that is uses the SCM type from
     This field only displays if the sourced project has the **Allow Branch Override** option checked:
 
     .. image:: ../common/images/projects-create-scm-project-branch-override-checked.png
+       :alt: Inventory sourced from a project with SCM project branch override checked
 
   - **Credential**: Optionally specify the credential to use for this source.
   - **Project**: Required. Pre-populates with a default project, otherwise, specify the project this inventory is using as its source. Click the |search| button to choose from a list of projects. If the list is extensive, use the search to narrow the options.
   - **Inventory File**: Required. Select an inventory file associated with the sourced project. If not already populated, you can type it into the text field within the drop down menu to filter the extraneous file types. In addition to a flat file inventory, you can point to a directory or an inventory script.
 
     .. image:: ../common/images/inventories-create-source-sourced-from-project-filter.png
+       :alt: Inventory file field of the Sourced from a project inventory type
 
 3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
 
@@ -876,213 +885,6 @@ An inventory that is sourced from a project means that is uses the SCM type from
 .. |Inventories - create source - sourced from project example| image:: ../common/images/inventories-create-source-sourced-from-project-example.png
 
 .. note:: If you are executing a custom inventory script from SCM, please make sure you set the execution bit (i.e. ``chmod +x``) on the script in your upstream source control. If you do not, AWX will throw a ``[Errno 13] Permission denied`` error upon execution.
-
-
-.. _ug_source_ec2:
-
-Amazon Web Services EC2
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Amazon Web Services
-
-1. To configure an AWS EC2-sourced inventory, select **Amazon EC2** from the Source field.
-
-2. The Create Source window expands with additional fields. Enter the following details:
-
-  - **Credential**: Optionally choose from an existing AWS credential (for more information, refer to :ref:`ug_credentials`).
-
-    If AWX is running on an EC2 instance with an assigned IAM Role, the credential may be omitted, and the security credentials from the instance metadata will be used instead. For more information on using IAM Roles, refer to the `IAM_Roles_for_Amazon_EC2_documentation_at_Amazon <http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam- roles-for-amazon-ec2.html>`_.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the ``aws_ec2`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `aws_ec2 inventory plugin documentation <https://cloud.redhat.com/ansible/automation-hub/repo/published/amazon/aws/content/inventory/aws_ec2>`__.
-
-|Inventories - create source - AWS EC2 example|
-
-.. |Inventories - create source - AWS EC2 example| image:: ../common/images/inventories-create-source-AWS-example.png
-
-.. note::
-
-  If you only use ``include_filters``, the AWS plugin always returns all the hosts. To use this properly, the first condition on the ``or`` must be on ``filters`` and then build the rest of the ``OR`` conditions on a list of ``include_filters``.
-
-.. _ug_source_gce:
-
-Google Compute Engine
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Google Compute Engine
-
-1. To configure a Google-sourced inventory, select **Google Compute Engine** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing GCE Credential. For more information, refer to :ref:`ug_credentials`.
-
-|Inventories - create source - GCE example|
-
-.. |Inventories - create source - GCE example| image:: ../common/images/inventories-create-source-GCE-example.png
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the ``gcp_compute`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `gcp_compute inventory plugin documentation <https://cloud.redhat.com/ansible/automation-hub/repo/published/google/cloud/content/inventory/gcp_compute>`__.
-
-
-.. _ug_source_azure:
-
-Microsoft Azure Resource Manager
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Microsoft Azure Resource Manager
-
-1. To configure a Azure Resource Manager-sourced inventory, select **Microsoft Azure Resource Manager** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing Azure Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the  ``azure_rm`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `azure_rm inventory plugin documentation <https://cloud.redhat.com/ansible/automation-hub/repo/published/azure/azcollection/content/inventory/azure_rm>`__.
-
-|Inventories - create source - Azure RM example|
-
-.. |Inventories - create source - Azure RM example| image:: ../common/images/inventories-create-source-azurerm-example.png
-
-
-.. _ug_source_vmvcenter:
-
-VMware vCenter
-~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; VMware vCenter
-
-
-1. To configure a VMWare-sourced inventory, select **VMware vCenter** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing VMware Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the ``vmware_inventory`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `vmware_inventory inventory plugin <https://github.com/ansible-collections/community.vmware/blob/main/plugins/inventory/vmware_vm_inventory.py>`__.
-
-  Starting with Ansible 2.9, VMWare properties have changed from lower case to camelCase. AWX provides aliases for the top-level keys, but lower case keys in nested properties have been discontinued.
-  For a list of valid and supported properties starting with Ansible 2.9, refer to `virtual machine attributes in the VMware dynamic inventory plugin <https://docs.ansible.com/ansible/latest/collections/community/vmware/docsite/vmware_scenarios/vmware_inventory_vm_attributes.html>`_.
-
-|Inventories - create source - VMware example|
-
-.. |Inventories - create source - VMWare example| image:: ../common/images/inventories-create-source-vmware-example.png
-
-
-.. _ug_source_satellite:
-
-Red Hat Satellite 6
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Red Hat Satellite 6
-
-1. To configure a Red Hat Satellite-sourced inventory, select **Red Hat Satellite** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing Satellite Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to specify parameters used by the foreman inventory source. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, refer to the `theforeman.foreman.foreman – Foreman inventory source <https://docs.ansible.com/ansible/latest/collections/theforeman/foreman/foreman_inventory.html>`_ in the Ansible documentation.
-
-
-|Inventories - create source - RH Satellite example|
-
-.. |Inventories - create source - RH Satellite example| image:: ../common/images/inventories-create-source-rhsat6-example.png
-
-If you encounter an issue with AWX inventory not having the "related groups" from Satellite, you might need to define these variables in the inventory source. See the inventory plugins template example for :ref:`ir_plugin_satellite` in the |atir| for detail.
-
-
-.. _ug_source_insights:
-
-Red Hat Insights
-~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Red Hat Insights
-
-1. To configure a Red Hat Insights-sourced inventory, select **Red Hat Insights** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing Insights Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the ``insights`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `insights inventory plugin <https://cloud.redhat.com/ansible/automation-hub/repo/published/redhat/insights/content/inventory/insights>`__.
-
-
-|Inventories - create source - RH Insights example|
-
-.. |Inventories - create source - RH Insights example| image:: ../common/images/inventories-create-source-insights-example.png
-
-
-.. _ug_source_openstack:
-
-OpenStack
-~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; OpenStack
-
-
-1. To configure an OpenStack-sourced inventory, select **OpenStack** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing OpenStack Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the ``openstack`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `openstack inventory plugin <https://docs.ansible.com/ansible/latest/collections/openstack/cloud/openstack_inventory.html>`_ in the Ansible collections documentation.
-
-|Inventories - create source - OpenStack example|
-
-.. |Inventories - create source - OpenStack example| image:: ../common/images/inventories-create-source-openstack-example.png
-
-
-.. _ug_source_rhv:
-
-Red Hat Virtualization
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Red Hat Virtualization
-
-1. To configure a Red Hat Virtualization-sourced inventory, select **Red Hat Virtualization** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing Red Hat Virtualization Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-4. Use the **Source Variables** field to override variables used by the ``ovirt`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. For a detailed description of these variables, view the `ovirt inventory plugin <https://cloud.redhat.com/ansible/automation-hub/repo/published/redhat/rhv/content/inventory/ovirt>`__.
-
-|Inventories - create source - RHV example|
-
-.. |Inventories - create source - RHV example| image:: ../common/images/inventories-create-source-rhv-example.png
-
-.. note::
-
-  Red Hat Virtualization (ovirt) inventory source requests are secure by default. To change this default setting, set the key ``ovirt_insecure`` to **true** in ``source_variables``, which is only available from the API details of the inventory source at the ``/api/v2/inventory_sources/N/`` endpoint.
-
-.. _ug_source_rhaap:
-
-Red Hat Ansible Automation Platform
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   pair: inventories; Red Hat Ansible Automation Platform
-
-
-1. To configure this type of sourced inventory, select **Red Hat Ansible Automation Platform** from the Source field.
-
-2. The Create Source window expands with the required **Credential** field. Choose from an existing Ansible Automation Platform Credential. For more information, refer to :ref:`ug_credentials`.
-
-3. You can optionally specify the verbosity, host filter, enabled variable/value, and update options as described in the main procedure for :ref:`adding a source <ug_add_inv_common_fields>`.
-
-  .. image:: ../common/images/inventories-create-source-rhaap-example.png
-
-4. Use the **Source Variables** field to override variables used by the ``controller`` inventory plugin. Enter variables using either JSON or YAML syntax. Use the radio button to toggle between the two. 
 
 .. _ug_customscripts:
 
@@ -1159,10 +961,7 @@ If an inventory was used to run a job, you can view details about those jobs in 
 |Inventories view completed jobs|
 
 .. |Inventories view completed jobs| image:: ../common/images/inventories-view-completed-jobs.png
-
-
-
-
+   :alt: Inventories view completed jobs
 
 .. _ug_inventories_run_ad_hoc:
 
@@ -1181,12 +980,15 @@ To run an ad hoc command:
 |ad hoc-commands-inventory-home|
 
 .. |ad hoc-commands-inventory-home| image:: ../common/images/inventories-add-group-host-added.png
+   :alt: Ad hoc commands inventory home
+
 
 2. Click the **Run Command** button.
 
 The Run command window opens.
 
 .. image:: ../common/images/ad-hoc-run-execute-command.png
+   :alt: Ad hoc run execute command
 
 3. Enter the details for the following fields:
 
@@ -1216,10 +1018,13 @@ The Run command window opens.
 |ad hoc-commands-inventory-run-command|
 
 .. |ad hoc-commands-inventory-run-command| image:: ../common/images/ad-hoc-commands-inventory-run-command.png
+   :alt: Ad hoc commands inventory run command
+
 
 4. Click **Next** to choose the |ee| you want the ad-hoc command to be run against.
 
 .. image:: ../common/images/ad-hoc-commands-inventory-run-command-ee.png
+   :alt: Ad hoc run command dialog prompting for Execution Environments with two listed to choose from
 
 5. Click **Next** to choose the credential you want to use and click the **Launch** button.
 
@@ -1229,3 +1034,5 @@ The results display in the **Output** tab of the module's job window.
 |ad hoc-commands-inventory-results-example|
 
 .. |ad hoc-commands-inventory-results-example| image:: ../common/images/ad-hoc-commands-inventory-results-example.png
+   :alt: Ad hoc commands inventory results example
+

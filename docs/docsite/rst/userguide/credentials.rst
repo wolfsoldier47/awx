@@ -128,8 +128,6 @@ The following credential types are supported with AWX:
 .. contents::
     :local:
 
-The credential types associated with Centrify, CyberArk, HashiCorp Vault, Microsoft Azure Key Management System (KMS), and Thycotic are part of the credential plugins capability that allows an external system to lookup your secrets information. See the :ref:`ug_credential_plugins` section for further detail.
-
 
 .. _ug_credentials_aws:
 
@@ -186,11 +184,6 @@ To populate the **Galaxy Server URL** and the **Auth Server URL** fields, look f
     :alt: Hub console tokens page
 
 
-Centrify Vault Credential Provider Lookup
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_centrify` for more detail.
-
-
 Container Registry
 ^^^^^^^^^^^^^^^^^^^
 .. index::
@@ -204,16 +197,6 @@ Aside from specifying a name, the **Authentication URL** is the only required fi
 
 .. |Credentials - create container credential| image:: ../common/images/credentials-create-container-credential.png
     :alt: Credentials - create container credential form
-
-
-CyberArk Central Credential Provider Lookup
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_cyberarkccp` for more detail.
-
-
-CyberArk Conjur Secrets Manager Lookup
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_cyberarkconjur` for more detail.
 
 
 .. _ug_credentials_github:
@@ -301,17 +284,6 @@ Selecting this credential type allows you to create a credential that gives AWX 
 
 See :ref:`ug_content_signing` for detailed information on how to generate a valid keypair, use the CLI tool to sign content, and how to add the public key to AWX.
 
-
-HashiCorp Vault Secret Lookup
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_hashivault` for more detail.
-
-
-HashiCorp Vault Signed SSH
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_hashivaultssh` for more detail.
-
-
 Insights
 ^^^^^^^^^^^
 
@@ -381,11 +353,6 @@ Machine credentials have several attributes that may be configured:
 
 .. warning::
    Credentials which are used in *Scheduled Jobs* must not be configured as "**Prompt on launch**".
-
-
-Microsoft Azure Key Vault
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_azurekeyvault` for more detail.
 
 
 Microsoft Azure Resource Manager
@@ -642,14 +609,6 @@ Source Control credentials have several attributes that may be configured:
     If you are using a GitHub account for a Source Control credential and you have 2FA (Two Factor Authentication) enabled on your account, you will need to use your Personal Access Token in the password field rather than your account password. 
 
 
-Thycotic DevOps Secrets Vault
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_thycoticvault` for more detail.
-
-
-Thycotic Secret Server
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is considered part of the secret management capability. See :ref:`ug_credentials_thycoticserver` for more detail.
 
 
 Vault

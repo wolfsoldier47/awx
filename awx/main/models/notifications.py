@@ -5,6 +5,7 @@ from copy import deepcopy
 import datetime
 import logging
 import json
+import traceback
 
 from django.db import models
 from django.conf import settings
@@ -30,6 +31,7 @@ from awx.main.notifications.mattermost_backend import MattermostBackend
 from awx.main.notifications.grafana_backend import GrafanaBackend
 from awx.main.notifications.rocketchat_backend import RocketChatBackend
 from awx.main.notifications.irc_backend import IrcBackend
+from awx.main.notifications.awssns_backend import AWSSNSBackend
 
 
 logger = logging.getLogger('awx.main.models.notifications')
@@ -39,6 +41,7 @@ __all__ = ['NotificationTemplate', 'Notification']
 
 class NotificationTemplate(CommonModelNameNotUnique):
     NOTIFICATION_TYPES = [
+        ('awssns', _('AWS SNS'), AWSSNSBackend),
         ('email', _('Email'), CustomEmailBackend),
         ('slack', _('Slack'), SlackBackend),
         ('twilio', _('Twilio'), TwilioBackend),
@@ -393,11 +396,11 @@ class JobNotificationMixin(object):
                 'verbosity': 0,
             },
             'job_friendly_name': 'Job',
-            'url': 'https://towerhost/#/jobs/playbook/1010',
+            'url': 'https://platformhost/#/jobs/playbook/1010',
             'approval_status': 'approved',
             'approval_node_name': 'Approve Me',
-            'workflow_url': 'https://towerhost/#/jobs/workflow/1010',
-            'job_metadata': """{'url': 'https://towerhost/$/jobs/playbook/13',
+            'workflow_url': 'https://platformhost/#/jobs/workflow/1010',
+            'job_metadata': """{'url': 'https://platformhost/$/jobs/playbook/13',
  'traceback': '',
  'status': 'running',
  'started': '2019-08-07T21:46:38.362630+00:00',
@@ -484,14 +487,29 @@ class JobNotificationMixin(object):
         if msg_template:
             try:
                 msg = env.from_string(msg_template).render(**context)
-            except (TemplateSyntaxError, UndefinedError, SecurityError):
-                msg = ''
+            except (TemplateSyntaxError, UndefinedError, SecurityError) as e:
+                msg = '\r\n'.join([e.message, ''.join(traceback.format_exception(None, e, e.__traceback__).replace('\n', '\r\n'))])
 
         if body_template:
             try:
                 body = env.from_string(body_template).render(**context)
-            except (TemplateSyntaxError, UndefinedError, SecurityError):
-                body = ''
+            except (TemplateSyntaxError, UndefinedError, SecurityError) as e:
+                body = '\r\n'.join([e.message, ''.join(traceback.format_exception(None, e, e.__traceback__).replace('\n', '\r\n'))])
+
+        # https://datatracker.ietf.org/doc/html/rfc2822#section-2.2
+        # Body should have at least 2 CRLF, some clients will interpret
+        # the email incorrectly with blank body.  So we will check that
+
+        if len(body.strip().splitlines()) < 1:
+            # blank body
+            body = '\r\n'.join(
+                [
+                    "The template rendering return a blank body.",
+                    "Please check the template.",
+                    "Refer to https://github.com/ansible/awx/issues/13983",
+                    "for further information.",
+                ]
+            )
 
         return (msg, body)
 
